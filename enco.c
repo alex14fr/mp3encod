@@ -2,10 +2,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <string.h>
 #include <lame/lame.h>
 
 #define BYTES_PER_SAMP 4
-#define BUFSAMP 1152*2*BYTES_PER_SAMP
+#define BUFSAMP 3*1152*2*BYTES_PER_SAMP
 #define BUFOUTSZ BUFSAMP
 #define BYTES_PER_FILE 10*60*44100*BYTES_PER_SAMP
 #define MIN(a,b) ( (a<b)?(a):(b) )
@@ -22,7 +23,7 @@ int main(int argc, char **argv) {
 	lame_global_flags *lamefl;
 
 	if(argc<2) {
-		printf("Usage: %s out%02d.mp3 < [raw PCM, signed 16-bit LE 44100 hz stereo]\n");
+		printf("Usage: %s out%%02d.mp3 < [raw PCM, signed 16-bit LE 44100 hz stereo]\n", argv[0]);
 		exit(1);
 	}
 	while(!finished) {
@@ -37,7 +38,9 @@ int main(int argc, char **argv) {
 		lamefl=lame_init();
 		lame_set_out_samplerate(lamefl, 44100);
 		lame_set_bWriteVbrTag(lamefl, 0);
-		lame_set_quality(lamefl, 2);
+		lame_set_quality(lamefl, 7);
+		lame_set_disable_reservoir(lamefl, 1);
+		lame_set_strict_ISO(lamefl, 1);
 		//lame_set_num_channels(lamefl, 1);
 		lame_set_mode(lamefl, MONO); 
 		lame_set_brate(lamefl, 64);
@@ -54,11 +57,9 @@ int main(int argc, char **argv) {
 			bytesRead += nr;
 			memset(buf_out, 0, BUFOUTSZ);
 			int nout=lame_encode_buffer_interleaved(lamefl, buf_in, nr/4, buf_out, BUFOUTSZ);
-			//printf("nout=%d\n", nout);
 			write(fd, buf_out, nout);
 		}
 		int nout=lame_encode_flush(lamefl, buf_out, BUFOUTSZ);
-		//printf("nout=%d\n", nout);
 		write(fd, buf_out, nout);
 		n_file++;
 
