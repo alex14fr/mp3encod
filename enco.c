@@ -6,7 +6,7 @@
 #include <lame/lame.h>
 
 #define BYTES_PER_SAMP 4
-#define BUFSAMP 3*1152*2*BYTES_PER_SAMP
+#define BUFSAMP 6*1152*2*BYTES_PER_SAMP
 #define BUFOUTSZ BUFSAMP
 #define BYTES_PER_FILE 10*60*44100*BYTES_PER_SAMP
 #define MIN(a,b) ( (a<b)?(a):(b) )
@@ -22,28 +22,29 @@ int main(int argc, char **argv) {
 	int fd;
 	lame_global_flags *lamefl;
 
-	if(argc<2) {
-		printf("Usage: %s out%%02d.mp3 < [raw PCM, signed 16-bit LE 44100 hz stereo]\n", argv[0]);
+	if(argc<3) {
+		printf("Usage: %s out%%02d.mp3 bitrate(kbps) [stereo] < [raw PCM, signed 16-bit LE 44100 hz stereo]\n", argv[0]);
 		exit(1);
 	}
 	while(!finished) {
 		snprintf(fnam, 256, argv[1], n_file);
 		printf("Creating %s...\n", fnam);
-		fd=open(fnam, O_WRONLY|O_CREAT|O_TRUNC);
+		fd=open(fnam, O_WRONLY|O_CREAT|O_TRUNC, 0660);
 		if(fd<0) {
 			perror("open");
 			exit(1);
 		}
 		bytesRead=0;
 		lamefl=lame_init();
-		lame_set_out_samplerate(lamefl, 44100);
+		//lame_set_out_samplerate(lamefl, 44100);
 		lame_set_bWriteVbrTag(lamefl, 0);
 		lame_set_quality(lamefl, 7);
 		lame_set_disable_reservoir(lamefl, 1);
 		lame_set_strict_ISO(lamefl, 1);
 		//lame_set_num_channels(lamefl, 1);
-		lame_set_mode(lamefl, MONO); 
-		lame_set_brate(lamefl, 64);
+		if(argc==3)
+			lame_set_mode(lamefl, MONO); 
+		lame_set_brate(lamefl, atoi(argv[2]));
 		lame_init_params(lamefl);
 		while(!finished && bytesRead<BYTES_PER_FILE) {
 			size_t count=MIN(BYTES_PER_FILE-bytesRead, BUFSAMP);
@@ -61,6 +62,7 @@ int main(int argc, char **argv) {
 		}
 		int nout=lame_encode_flush(lamefl, buf_out, BUFOUTSZ);
 		write(fd, buf_out, nout);
+		lame_close(lamefl);
 		n_file++;
 
 	}

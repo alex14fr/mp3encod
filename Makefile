@@ -1,5 +1,5 @@
 LDLIBS = -lmp3lame
-BINS = enco
+BINS = enco fatcopy
 all: $(BINS)
 clean:
 	rm -f $(BINS)
