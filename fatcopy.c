@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <libgen.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>
 
 struct bpb {
 	uint16_t bytesPerSector;
@@ -163,9 +165,82 @@ void dosName(char *unixName, char dosNam[11]) {
 	}
 }
 
+void format(int fd) {
+	struct stat sb;
+	uint32_t nsectors;
+
+	fstat(fd, &sb);
+
+	if((sb.st_mode & S_IFMT) == S_IFREG) {
+		nsectors=sb.st_size/512;
+	} else if((sb.st_mode & S_IFMT) == S_IFBLK) {
+		uint64_t sz64;
+		ioctl(fd, BLKGETSIZE64, &sz64);
+		nsectors=sz64/512;
+	} else {
+		printf("unsupported file type\n");
+		exit(1);
+	}
+
+	uint8_t secPerClus;
+	uint16_t nrootent=512;
+
+	if(nsectors<=8400) { printf("nsectors=%d is too small for FAT16, should be at least 8,401\n", nsectors); exit(1); }
+	else if(nsectors<=32680) { secPerClus=2; nrootent=128; }
+	else if(nsectors<=262144) { secPerClus=4; nrootent=256; }
+	else if(nsectors<=524288) { secPerClus=8; }
+	else if(nsectors<=1048576) { secPerClus=16; }
+	else if(nsectors<=2097152) { secPerClus=32; }
+	else if(nsectors<=4194304) { secPerClus=64; }
+	else { printf("nsectors=%d is too large for FAT16, should be at most 4,194,304\n", nsectors); exit(1); }
+
+	struct bpb param;
+
+	param.bytesPerSector=512;
+	param.sectorsPerCluster=secPerClus;
+	param.rsvdSectorCount=1;
+	param.nFAT=1;
+	param.rootDirEntries=nrootent;
+	if(nsectors < 65536) {
+		param.totalSectorCount16=nsectors;
+		param.totalSectorCount32=0;
+	} else {
+		param.totalSectorCount16=0;
+		param.totalSectorCount32=nsectors;
+	}
+	param.mediaType=0xf8;
+
+	uint32_t tmpval1=nsectors-param.rsvdSectorCount-param.rootDirEntries*32/512;
+	uint32_t tmpval2=256*secPerClus+param.nFAT;
+	uint32_t fatsz=(tmpval1+tmpval2-1)/tmpval2;
+	param.sectorsPerFAT=(uint16_t)fatsz;
+
+	printBPB(&param);
+
+	unsigned char bootsect[512];
+	memset(bootsect, 0, 512);
+	memcpy(bootsect+0xB, (char*)(&param), sizeof(struct bpb));
+	memcpy(bootsect, "\xe9\xfa\x0", 3);
+	memcpy(bootsect+510, "\x55\xaa", 2);
+	memcpy(bootsect+24, "\x1\x0", 2); // sectors per track=1
+	memcpy(bootsect+26, "\x1\x0", 2); // number of heads=1
+	memcpy(bootsect+38, "\x29\x0\x0\x0\x0NO NAME    FAT16   ", 24);
+	lseek(fd, 0, SEEK_SET);
+	write(fd, bootsect, 512);
+	uint32_t secToClear=param.rsvdSectorCount-1+param.rootDirEntries*32/512+param.nFAT*param.sectorsPerFAT;
+	memset(bootsect, 0, 512);
+	for(uint32_t i=0; i<secToClear; i++)
+		write(fd, bootsect, 512);
+	lseek(fd, 512*param.rsvdSectorCount, SEEK_SET);
+	write(fd, "\xf8\xff\xff\xff", 4);
+
+	uint32_t overhead=512*(1+secToClear);
+	printf("%d bytes available for data\n", 512*nsectors-overhead);
+}
+
 int main(int argc, char **argv) {
 	if(argc==1) {
-		printf("Usage: %s <fat16-file> <file1> ... <fileN>\n", argv[0]);	
+		printf("Usage: \n   %s <fat16-file> <file1> ... <fileN>\n   %s <fat16-file> @format\n", argv[0], argv[0]);	
 		exit(0);
 	}
 
@@ -174,6 +249,12 @@ int main(int argc, char **argv) {
 		perror("open");
 		exit(1);
 	}
+
+	if(argc==3 && (!strcmp(argv[2],"@format"))) {
+		format(fd);
+		exit(0);
+	}
+
 	struct bpb param;
 	struct bpbo offs;
 	readBPB(fd, &param, &offs);
