@@ -210,10 +210,18 @@ void format(int fd) {
 	}
 	param.mediaType=0xf8;
 
+/*
 	uint32_t tmpval1=nsectors-param.rsvdSectorCount-param.rootDirEntries*32/512;
 	uint32_t tmpval2=256*secPerClus+param.nFAT;
 	uint32_t fatsz=(tmpval1+tmpval2-1)/tmpval2;
 	param.sectorsPerFAT=(uint16_t)fatsz;
+*/
+
+	uint32_t tmpval1=nsectors-param.rsvdSectorCount-param.rootDirEntries*32/512-2*secPerClus;
+	uint32_t tmpval2=1+256*secPerClus;
+	uint32_t fatsz=(tmpval1+tmpval2-1)/tmpval2;
+	param.sectorsPerFAT=(uint16_t)fatsz;
+	
 
 	printBPB(&param);
 
