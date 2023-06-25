@@ -228,7 +228,7 @@ void format(int fd) {
 	unsigned char bootsect[512];
 	memset(bootsect, 0, 512);
 	memcpy(bootsect+0xB, (char*)(&param), sizeof(struct bpb));
-	memcpy(bootsect, "\xe9\xfa\x0", 3);
+	memcpy(bootsect, "\xf4\xeb\xfd", 3);
 	memcpy(bootsect+510, "\x55\xaa", 2);
 	memcpy(bootsect+24, "\x1\x0", 2); // sectors per track=1
 	memcpy(bootsect+26, "\x1\x0", 2); // number of heads=1
