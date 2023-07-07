@@ -1,0 +1,6 @@
+#!/bin/sh
+set -x
+ffmpeg -i "$1" -ar 44100  -f s16le - |~al/mp3encod/enco "/tmp/""$2""%02d.mp3" 48
+cd /tmp
+~al/mp3encod/fatcopy /dev/sdb1 "$2"*.mp3
+
