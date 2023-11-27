@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <string.h>
+#include <stdint.h>
 #include <lame/lame.h>
 
 #define BYTES_PER_SAMP 4
@@ -57,6 +58,15 @@ int main(int argc, char **argv) {
 			}
 			bytesRead += nr;
 			memset(buf_out, 0, BUFOUTSZ);
+			for(uint32_t ii=0; ii<(count >> 1); ++ii) {
+				if(buf_in[ii] > 16000) {
+					buf_in[ii]=32760;
+				} else if(buf_in[ii] < -16000) {
+					buf_in[ii]=-32760;
+				} else {
+					buf_in[ii] *= 2; //buf_in[ii]/2;
+				}
+			}
 			int nout=lame_encode_buffer_interleaved(lamefl, buf_in, nr/4, buf_out, BUFOUTSZ);
 			write(fd, buf_out, nout);
 		}
